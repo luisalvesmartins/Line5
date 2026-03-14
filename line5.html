@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Line-5 Grid Game</title>
+<style>
+:root {
+  /* Dark theme (default) */
+  --bg:           #1a1a2e;
+  --header-bg:    #16213e;
+  --header-border:#0f3460;
+  --title-color:  #e94560;
+  --stat-color:   #a0a0c0;
+  --accent:       #00fff5;
+  --btn-bg:       #0f3460;
+  --btn-color:    #e0e0e0;
+  --btn-border:   #e94560;
+  --btn-hover-bg: #e94560;
+  --undo-bg:      #3a1a5e;
+  --undo-border:  #b060ff;
+  --undo-hover:   #7c3aed;
+  --tooltip-bg:   rgba(15,52,96,0.95);
+  --tooltip-border:#e94560;
+  --overlay-bg:   rgba(0,0,0,0.8);
+  --modal-bg:     #16213e;
+  --modal-border: #e94560;
+  --info-color:   #666;
+  --saved-color:  #00fff5;
+  /* Canvas colors (read by JS) */
+  --c-grid:       rgba(255,255,255,0.07);
+  --c-dot:        rgba(255,255,255,0.08);
+  --c-line-glow:  rgba(0,255,245,0.12);
+  --c-line:       rgba(0,255,245,0.55);
+  --c-cell-init:  #2a5298;
+  --c-cell-init-stroke: #4a8fe7;
+  --c-cell-play:  #e94560;
+  --c-cell-play-stroke: #ff6b81;
+}
+
+body.light {
+  --bg:           #f0f4f8;
+  --header-bg:    #dbe4ee;
+  --header-border:#b0c4de;
+  --title-color:  #c0392b;
+  --stat-color:   #555e6e;
+  --accent:       #0077cc;
+  --btn-bg:       #b0c4de;
+  --btn-color:    #1a1a2e;
+  --btn-border:   #c0392b;
+  --btn-hover-bg: #c0392b;
+  --undo-bg:      #d8c8f0;
+  --undo-border:  #7c3aed;
+  --undo-hover:   #7c3aed;
+  --tooltip-bg:   rgba(219,228,238,0.97);
+  --tooltip-border:#c0392b;
+  --overlay-bg:   rgba(0,0,0,0.5);
+  --modal-bg:     #dbe4ee;
+  --modal-border: #c0392b;
+  --info-color:   #999;
+  --saved-color:  #0077cc;
+  --c-grid:       rgba(0,0,0,0.08);
+  --c-dot:        rgba(0,0,0,0.1);
+  --c-line-glow:  rgba(0,100,200,0.12);
+  --c-line:       rgba(0,100,200,0.55);
+  --c-cell-init:  #5b8dd9;
+  --c-cell-init-stroke: #2a5298;
+  --c-cell-play:  #c0392b;
+  --c-cell-play-stroke: #e74c3c;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--stat-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  transition: background 0.3s, color 0.3s;
+}
+#header {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding: 12px 24px;
+  background: var(--header-bg);
+  width: 100%;
+  justify-content: center;
+  border-bottom: 2px solid var(--header-border);
+  z-index: 10;
+  flex-wrap: wrap;
+  transition: background 0.3s, border-color 0.3s;
+}
+#header h1 {
+  font-size: 22px;
+  color: var(--title-color);
+  letter-spacing: 2px;
+}
+.stat {
+  font-size: 16px;
+  color: var(--stat-color);
+}
+.stat span {
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 20px;
+}
+#controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#controls button {
+  padding: 6px 16px;
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s, color 0.2s;
+}
+#controls button:hover:not(:disabled) { background: var(--btn-hover-bg); color: #fff; }
+#controls button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+#btnUndo {
+  background: var(--undo-bg) !important;
+  border-color: var(--undo-border) !important;
+}
+#btnUndo:hover:not(:disabled) {
+  background: var(--undo-hover) !important;
+  color: #fff !important;
+}
+#btnTheme {
+  font-size: 16px;
+  padding: 4px 10px;
+}
+#canvasWrap {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+#canvasWrap.dragging { cursor: grabbing; }
+canvas {
+  position: absolute;
+  top: 0; left: 0;
+}
+#tooltip {
+  position: fixed;
+  background: var(--tooltip-bg);
+  color: var(--btn-color);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  pointer-events: none;
+  display: none;
+  border: 1px solid var(--tooltip-border);
+  z-index: 100;
+}
+#gameOverOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--overlay-bg);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+#gameOverOverlay .modal-content {
+  background: var(--modal-bg);
+  border: 2px solid var(--modal-border);
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+}
+#gameOverOverlay h2 { color: var(--title-color); font-size: 32px; margin-bottom: 10px; }
+#gameOverOverlay .final-score { color: var(--accent); font-size: 48px; font-weight: bold; }
+#gameOverOverlay button {
+  margin-top: 20px;
+  padding: 10px 30px;
+  background: var(--title-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+}
+#highScoreVal { color: #ffd700 !important; }
+.new-best { animation: pulse-gold 0.6s ease-in-out 3; }
+@keyframes pulse-gold {
+  0%,100% { text-shadow: none; }
+  50% { text-shadow: 0 0 12px #ffd700, 0 0 24px #ffd700; }
+}
+#savedBadge {
+  font-size: 11px;
+  color: var(--saved-color);
+  opacity: 0;
+  transition: opacity 0.4s;
+  padding: 3px 8px;
+  border: 1px solid var(--saved-color);
+  border-radius: 10px;
+}
+#info {
+  font-size: 12px;
+  color: var(--info-color);
+  padding: 4px;
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>LINE-5</h1>
+  <div class="stat">Score: <span id="scoreVal">0</span></div>
+  <div class="stat">Best: <span id="highScoreVal">0</span></div>
+  <div class="stat">Move: <span id="moveVal">0</span></div>
+  <div class="stat">Available: <span id="availVal">0</span></div>
+  <div id="controls">
+    <button id="btnUndo" disabled>↩ Undo</button>
+    <button id="btnReset">Reset</button>
+    <button id="btnCenter">Center</button>
+    <button id="btnZoomIn">+</button>
+    <button id="btnZoomOut">−</button>
+    <button id="btnTheme" title="Toggle theme">🌙</button>
+    <span id="savedBadge">✓ Saved</span>
+  </div>
+</div>
+
+<div id="canvasWrap">
+  <canvas id="gameCanvas"></canvas>
+</div>
+
+<div id="tooltip"></div>
+
+
+<div id="gameOverOverlay">
+  <div class="modal-content">
+    <h2>GAME OVER</h2>
+    <p style="color:#a0a0c0;margin-bottom:10px;">No more valid moves!</p>
+    <div class="final-score" id="finalScore">0</div>
+    <p style="color:#a0a0c0;margin-top:4px;">points</p>
+    <p id="newBestMsg" style="color:#ffd700;font-size:18px;font-weight:bold;margin-top:8px;display:none;">🏆 New High Score!</p>
+    <p style="color:#666;font-size:14px;margin-top:6px;">Best: <span id="finalHighScore" style="color:#ffd700;font-weight:bold;">0</span></p>
+    <button onclick="resetGame()">Play Again</button>
+  </div>
+</div>
+
+<div id="info">Scroll to zoom · Drag to pan · Click to play · Multiple lines: click to cycle, double-click to confirm · Esc to cancel · Ctrl+Z to undo</div>
+
+<script>
+// ===== GAME STATE =====
+const STORAGE_KEY = 'line5_save';
+const HIGHSCORE_KEY = 'line5_highscore';
+
+let highScore = parseInt(localStorage.getItem(HIGHSCORE_KEY) || '0', 10);
+
+// ===== SAVE / LOAD =====
+function saveGame() {
+  const state = {
+    filledCells: [...filledCells],
+    cellMoveNum,
+    drawnSegments: [...drawnSegments],
+    drawnLines,
+    score,
+    moveCount,
+    gameOver,
+    undoHistory,
+    camX, camY, cellSize
+  };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    flashSaved();
+  } catch(e) { /* quota exceeded etc. */ }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    filledCells = new Set(s.filledCells);
+    cellMoveNum = s.cellMoveNum;
+    drawnSegments = new Set(s.drawnSegments);
+    drawnLines = s.drawnLines;
+    score = s.score;
+    moveCount = s.moveCount;
+    gameOver = s.gameOver;
+    undoHistory = s.undoHistory;
+    camX = s.camX; camY = s.camY; cellSize = s.cellSize;
+    return true;
+  } catch(e) { return false; }
+}
+
+function clearSave() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+let savedFadeTimer = null;
+function flashSaved() {
+  const badge = document.getElementById('savedBadge');
+  badge.style.opacity = '1';
+  if (savedFadeTimer) clearTimeout(savedFadeTimer);
+  savedFadeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1200);
+}
+
+function updateHighScore() {
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem(HIGHSCORE_KEY, highScore);
+    const el = document.getElementById('highScoreVal');
+    el.classList.remove('new-best');
+    void el.offsetWidth; // reflow to restart animation
+    el.classList.add('new-best');
+  }
+}
+
+const INITIAL_CELLS = [
+  [3,0],[4,0],[5,0],[6,0],
+  [3,1],[6,1],
+  [3,2],[6,2],
+  [0,3],[1,3],[2,3],[3,3],[6,3],[7,3],[8,3],[9,3],
+  [0,4],[9,4],
+  [0,5],[9,5],
+  [0,6],[1,6],[2,6],[3,6],[6,6],[7,6],[8,6],[9,6],
+  [3,7],[6,7],
+  [3,8],[6,8],
+  [3,9],[4,9],[5,9],[6,9]
+];
+
+let filledCells = new Set();
+let cellMoveNum = {};
+let drawnSegments = new Set();
+let drawnLines = [];
+let score = 0;
+let moveCount = 0;
+let validMoves = new Map();
+let gameOver = false;
+
+// Visual line-choice state
+let choosingCell = null;   // {x, y, lines[]} — set when user clicks a multi-line cell
+let choosingIndex = 0;     // which line is currently previewed
+let mouseScreenX = 0, mouseScreenY = 0;
+let longPressTimer = null;const DIRECTIONS = [
+  [1, 0],   // horizontal
+  [0, 1],   // vertical
+  [1, 1],   // diagonal down-right
+  [1, -1],  // diagonal up-right
+];
+const DIR_NAMES = ['Horizontal →', 'Vertical ↓', 'Diagonal ↘', 'Diagonal ↗'];
+
+function cellKey(x, y) { return x + ',' + y; }
+
+function segKey(x1, y1, x2, y2) {
+  if (x1 < x2 || (x1 === x2 && y1 < y2)) return `${x1},${y1},${x2},${y2}`;
+  return `${x2},${y2},${x1},${y1}`;
+}
+
+function isSegmentDrawn(x1, y1, x2, y2) {
+  return drawnSegments.has(segKey(x1, y1, x2, y2));
+}
+
+function markSegmentsDrawn(cells) {
+  const segs = [];
+  for (let i = 0; i < cells.length - 1; i++) {
+    const sk = segKey(cells[i][0], cells[i][1], cells[i+1][0], cells[i+1][1]);
+    drawnSegments.add(sk);
+    segs.push(sk);
+  }
+  return segs;
+}
+
+function lineSegmentsOverlap(cells) {
+  for (let i = 0; i < cells.length - 1; i++) {
+    if (isSegmentDrawn(cells[i][0], cells[i][1], cells[i+1][0], cells[i+1][1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findValidLines(px, py) {
+  const results = [];
+  for (let d = 0; d < DIRECTIONS.length; d++) {
+    const [dx, dy] = DIRECTIONS[d];
+    for (let offset = 0; offset < 5; offset++) {
+      const startX = px - offset * dx;
+      const startY = py - offset * dy;
+      const lineCells = [];
+      let allOthersFilled = true;
+      for (let i = 0; i < 5; i++) {
+        const cx = startX + i * dx;
+        const cy = startY + i * dy;
+        lineCells.push([cx, cy]);
+        if (cx === px && cy === py) continue;
+        if (!filledCells.has(cellKey(cx, cy))) {
+          allOthersFilled = false;
+          break;
+        }
+      }
+      if (!allOthersFilled) continue;
+      if (lineSegmentsOverlap(lineCells)) continue;
+      results.push({ cells: lineCells, dirIndex: d });
+    }
+  }
+  const unique = [];
+  const seen = new Set();
+  for (const r of results) {
+    const key = r.cells.map(c => c.join(',')).join('|');
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(r);
+    }
+  }
+  return unique;
+}
+
+function computeValidMoves() {
+  validMoves.clear();
+  const candidates = new Set();
+  for (const key of filledCells) {
+    const [fx, fy] = key.split(',').map(Number);
+    for (let d = 0; d < DIRECTIONS.length; d++) {
+      const [dx, dy] = DIRECTIONS[d];
+      for (let dist = -4; dist <= 4; dist++) {
+        const cx = fx + dist * dx;
+        const cy = fy + dist * dy;
+        const ck = cellKey(cx, cy);
+        if (!filledCells.has(ck)) {
+          candidates.add(ck);
+        }
+      }
+    }
+  }
+  for (const ck of candidates) {
+    const [cx, cy] = ck.split(',').map(Number);
+    const lines = findValidLines(cx, cy);
+    if (lines.length > 0) {
+      validMoves.set(ck, lines);
+    }
+  }
+}
+
+function placeCell(x, y, chosenLine) {
+  moveCount++;
+  score++;
+  const ck = cellKey(x, y);
+  filledCells.add(ck);
+  cellMoveNum[ck] = moveCount;
+  const segs = markSegmentsDrawn(chosenLine.cells);
+  drawnLines.push({ cells: chosenLine.cells, moveNum: moveCount });
+
+  undoHistory.push({
+    cellKey: ck,
+    x: x,
+    y: y,
+    moveNum: moveCount,
+    line: chosenLine,
+    segments: segs,
+  });
+
+  computeValidMoves();
+  updateUI();
+  updateHighScore();
+  if (validMoves.size === 0) {
+    gameOver = true;
+    clearSave();
+    const isNew = score >= highScore;
+    updateHighScore();
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalHighScore').textContent = highScore;
+    document.getElementById('newBestMsg').style.display = isNew ? 'block' : 'none';
+    document.getElementById('gameOverOverlay').style.display = 'flex';
+  } else {
+    saveGame();
+  }
+}
+
+function undoLastMove() {
+  if (undoHistory.length === 0) return;
+  if (gameOver) {
+    gameOver = false;
+    document.getElementById('gameOverOverlay').style.display = 'none';
+  }
+  const entry = undoHistory.pop();
+  filledCells.delete(entry.cellKey);
+  delete cellMoveNum[entry.cellKey];
+  for (const sk of entry.segments) {
+    drawnSegments.delete(sk);
+  }
+  if (drawnLines.length > 0 && drawnLines[drawnLines.length - 1].moveNum === entry.moveNum) {
+    drawnLines.pop();
+  }
+  moveCount--;
+  score--;
+  computeValidMoves();
+  updateUI();
+  saveGame();
+}
+
+// ===== CAMERA & RENDERING =====
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+
+let camX = 4.5, camY = 4.5;
+let cellSize = 52;
+let hoveredCell = null;
+
+function resizeCanvas() {
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  render();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// Grid lines pass through intersections (cell centers)
+function gridToScreen(gx, gy) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  return [cx + (gx - camX) * cellSize, cy + (gy - camY) * cellSize];
+}
+
+function screenToGrid(sx, sy) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  return [(sx - cx) / cellSize + camX, (sy - cy) / cellSize + camY];
+}
+
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const [gxMin, gyMin] = screenToGrid(0, 0);
+  const [gxMax, gyMax] = screenToGrid(W, H);
+  const xMin = Math.floor(gxMin) - 1;
+  const xMax = Math.ceil(gxMax) + 1;
+  const yMin = Math.floor(gyMin) - 1;
+  const yMax = Math.ceil(gyMax) + 1;
+
+  // Read theme colors from CSS variables
+  const cs = getComputedStyle(document.documentElement);
+  const cGrid     = cs.getPropertyValue('--c-grid').trim();
+  const cDot      = cs.getPropertyValue('--c-dot').trim();
+  const cLineGlow = cs.getPropertyValue('--c-line-glow').trim();
+  const cLine     = cs.getPropertyValue('--c-line').trim();
+  const cInit     = cs.getPropertyValue('--c-cell-init').trim();
+  const cInitStroke = cs.getPropertyValue('--c-cell-init-stroke').trim();
+  const cPlay     = cs.getPropertyValue('--c-cell-play').trim();
+  const cPlayStroke = cs.getPropertyValue('--c-cell-play-stroke').trim();
+
+  // Grid lines aligned through intersections (cell centers)
+  ctx.strokeStyle = cGrid;
+  ctx.lineWidth = 1;
+  for (let x = xMin; x <= xMax; x++) {
+    const [sx] = gridToScreen(x, 0);
+    ctx.beginPath();
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx, H);
+    ctx.stroke();
+  }
+  for (let y = yMin; y <= yMax; y++) {
+    const [, sy] = gridToScreen(0, y);
+    ctx.beginPath();
+    ctx.moveTo(0, sy);
+    ctx.lineTo(W, sy);
+    ctx.stroke();
+  }
+
+  // Small intersection dots for visual reference
+  ctx.fillStyle = cDot;
+  for (let x = xMin; x <= xMax; x++) {
+    for (let y = yMin; y <= yMax; y++) {
+      const [sx, sy] = gridToScreen(x, y);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Determine which valid move cells share a direction axis with another valid move cell.
+  // Two cells share an axis if they lie on the same row, column, diagonal ↘, or diagonal ↗.
+  const validKeys = [...validMoves.keys()];
+  const sharedAxisCells = new Set();
+  for (let i = 0; i < validKeys.length; i++) {
+    const [ax, ay] = validKeys[i].split(',').map(Number);
+    for (let j = i + 1; j < validKeys.length; j++) {
+      const [bx, by] = validKeys[j].split(',').map(Number);
+      const dist = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+      const sameRow   = ay === by;
+      const sameCol   = ax === bx;
+      const sameDiag1 = (ax - ay) === (bx - by);
+      const sameDiag2 = (ax + ay) === (bx + by);
+      if (!(sameRow || sameCol || sameDiag1 || sameDiag2)) continue;
+      if (dist < 9) continue;
+      const stepX = bx === ax ? 0 : (bx - ax) / Math.abs(bx - ax);
+      const stepY = by === ay ? 0 : (by - ay) / Math.abs(by - ay);
+      // All cells between must be filled, and none can be part of a drawn line segment on this axis
+      let valid = true;
+      for (let s = 1; s < dist; s++) {
+        const mx = ax + s * stepX;
+        const my = ay + s * stepY;
+        const mk = cellKey(mx, my);
+        // Must be filled or a valid move (no empty gaps)
+        if (!filledCells.has(mk) && !validMoves.has(mk)) { valid = false; break; }
+        // Must not have a drawn segment passing through it on this same axis direction
+        const prevSk = segKey(mx - stepX, my - stepY, mx, my);
+        const nextSk = segKey(mx, my, mx + stepX, my + stepY);
+        if (drawnSegments.has(prevSk) || drawnSegments.has(nextSk)) { valid = false; break; }
+      }
+      if (valid) {
+        sharedAxisCells.add(validKeys[i]);
+        sharedAxisCells.add(validKeys[j]);
+      }
+    }
+  }
+
+  // Valid move highlights — green if shares an axis with another move, orange otherwise
+  for (const [key, lines] of validMoves) {
+    const [vx, vy] = key.split(',').map(Number);
+    if (vx < xMin || vx > xMax || vy < yMin || vy > yMax) continue;
+    const [sx, sy] = gridToScreen(vx, vy);
+    const isHovered = hoveredCell && hoveredCell[0] === vx && hoveredCell[1] === vy;
+    const isGreen = sharedAxisCells.has(key);
+    const r = cellSize * 0.32;
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    if (isGreen) {
+      ctx.fillStyle = isHovered ? 'rgba(50,220,100,0.45)' : 'rgba(50,220,100,0.15)';
+      ctx.fill();
+      ctx.strokeStyle = isHovered ? 'rgba(80,255,140,0.95)' : 'rgba(50,200,80,0.7)';
+    } else {
+      ctx.fillStyle = isHovered ? 'rgba(255,165,0,0.45)' : 'rgba(255,165,0,0.15)';
+      ctx.fill();
+      ctx.strokeStyle = isHovered ? 'rgba(255,200,50,0.9)' : 'rgba(255,165,0,0.6)';
+    }
+    ctx.lineWidth = isHovered ? 2.5 : 1.8;
+    ctx.stroke();
+
+    const count = lines.length;
+    ctx.fillStyle = isGreen
+      ? (isHovered ? 'rgba(120,255,160,1)' : 'rgba(80,220,120,0.85)')
+      : (isHovered ? 'rgba(255,210,80,1)' : 'rgba(255,180,50,0.85)');
+    ctx.font = `bold ${Math.max(10, cellSize * 0.26)}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(count, sx, sy + 1);
+  }
+
+  // Drawn lines
+  ctx.lineCap = 'round';
+  for (const line of drawnLines) {
+    const cells = line.cells;
+    const [sx0, sy0] = gridToScreen(cells[0][0], cells[0][1]);
+    const [sx1, sy1] = gridToScreen(cells[4][0], cells[4][1]);
+    // Glow
+    ctx.strokeStyle = cLineGlow;
+    ctx.lineWidth = cellSize * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(sx0, sy0);
+    ctx.lineTo(sx1, sy1);
+    ctx.stroke();
+    // Line
+    ctx.strokeStyle = cLine;
+    ctx.lineWidth = cellSize * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(sx0, sy0);
+    ctx.lineTo(sx1, sy1);
+    ctx.stroke();
+  }
+
+  // Preview line when in choosing mode
+  if (choosingCell) {
+    const line = choosingCell.lines[choosingIndex];
+    const cells = line.cells;
+    const [sx0, sy0] = gridToScreen(cells[0][0], cells[0][1]);
+    const [sx1, sy1] = gridToScreen(cells[4][0], cells[4][1]);
+    // Bright animated-looking glow
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,100,0.18)';
+    ctx.lineWidth = cellSize * 0.22;
+    ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(sx1, sy1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,230,0,0.85)';
+    ctx.lineWidth = cellSize * 0.07;
+    ctx.setLineDash([cellSize * 0.18, cellSize * 0.1]);
+    ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(sx1, sy1); ctx.stroke();
+    ctx.setLineDash([]);
+    // Highlight the target cell
+    const [tsx, tsy] = gridToScreen(choosingCell.x, choosingCell.y);
+    ctx.beginPath();
+    ctx.arc(tsx, tsy, cellSize * 0.38, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,230,0,0.25)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,230,0,0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Direction label near cell
+    ctx.fillStyle = 'rgba(255,230,0,1)';
+    ctx.font = `bold ${Math.max(11, cellSize * 0.22)}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(DIR_NAMES[line.dirIndex], tsx, tsy - cellSize * 0.42);
+  }
+  for (const key of filledCells) {
+    const [fx, fy] = key.split(',').map(Number);
+    if (fx < xMin || fx > xMax || fy < yMin || fy > yMax) continue;
+    const [sx, sy] = gridToScreen(fx, fy);
+    const r = cellSize * 0.32;
+    const mn = cellMoveNum[key];
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    if (mn === 0) {
+      ctx.fillStyle = cInit;
+      ctx.fill();
+      ctx.strokeStyle = cInitStroke;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = cPlay;
+      ctx.fill();
+      ctx.strokeStyle = cPlayStroke;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    if (mn > 0) {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.max(10, cellSize * 0.28)}px 'Segoe UI', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(mn, sx, sy + 1);
+    }
+  }
+}
+
+function updateUI() {
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('highScoreVal').textContent = highScore;
+  document.getElementById('moveVal').textContent = moveCount;
+  document.getElementById('availVal').textContent = validMoves.size;
+  document.getElementById('btnUndo').disabled = undoHistory.length === 0;
+  render();
+}
+
+// ===== INPUT HANDLING =====
+let isDragging = false;
+let dragStartX, dragStartY, dragStartCamX, dragStartCamY;
+let dragMoved = false;
+
+wrap.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragMoved = false;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragStartCamX = camX;
+  dragStartCamY = camY;
+  wrap.classList.add('dragging');
+
+  // Long press confirms the currently previewed line (same as double-click)
+  if (choosingCell) {
+    longPressTimer = setTimeout(() => {
+      if (choosingCell && !dragMoved) {
+        const chosen = choosingCell.lines[choosingIndex];
+        const cx = choosingCell.x, cy = choosingCell.y;
+        choosingCell = null;
+        placeCell(cx, cy, chosen);
+      }
+    }, 500);
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  mouseScreenX = e.clientX;
+  mouseScreenY = e.clientY;
+  if (isDragging) {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) {
+      dragMoved = true;
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }
+    camX = dragStartCamX - dx / cellSize;
+    camY = dragStartCamY - dy / cellSize;
+    render();
+  }
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const [gx, gy] = screenToGrid(mx, my);
+  const hx = Math.round(gx);
+  const hy = Math.round(gy);
+  if (!hoveredCell || hoveredCell[0] !== hx || hoveredCell[1] !== hy) {
+    hoveredCell = [hx, hy];
+    if (!isDragging) render();
+  }
+
+  // Update which line is previewed based on mouse angle from chosen cell
+  if (choosingCell) {
+    const [csx, csy] = gridToScreen(choosingCell.x, choosingCell.y);
+    const angle = Math.atan2(my - csy, mx - csx); // -π to π
+    // Map angle to closest line direction
+    const lines = choosingCell.lines;
+    // For each line, compute the angle of its direction vector
+    let bestIdx = 0, bestDot = -Infinity;
+    for (let li = 0; li < lines.length; li++) {
+      const c = lines[li].cells;
+      const dx = c[4][0] - c[0][0];
+      const dy = c[4][1] - c[0][1];
+      const lineAngle = Math.atan2(dy, dx);
+      // Use absolute cosine similarity (direction or its opposite both work)
+      const diff = angle - lineAngle;
+      const dot = Math.cos(diff);
+      const dotFlip = Math.cos(diff + Math.PI);
+      const best = Math.max(dot, dotFlip);
+      if (best > bestDot) { bestDot = best; bestIdx = li; }
+    }
+    if (choosingIndex !== bestIdx) {
+      choosingIndex = bestIdx;
+      render();
+    }
+  }
+
+  const tooltip = document.getElementById('tooltip');
+  const ck = cellKey(hx, hy);
+  if (choosingCell) {
+    const line = choosingCell.lines[choosingIndex];
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 14) + 'px';
+    tooltip.textContent = `${DIR_NAMES[line.dirIndex]} — click to cycle · double-click to confirm · Esc to cancel`;
+  } else if (validMoves.has(ck)) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 14) + 'px';
+    const lines = validMoves.get(ck);
+    tooltip.textContent = `(${hx}, ${hy}) — ${lines.length} line${lines.length>1?'s':''} available`;
+  } else if (filledCells.has(ck)) {
+    const mn = cellMoveNum[ck];
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 14) + 'px';
+    tooltip.textContent = mn === 0 ? `(${hx}, ${hy}) — initial` : `(${hx}, ${hy}) — move #${mn}`;
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (isDragging && !dragMoved) {
+    handleClick(e);
+  }
+  isDragging = false;
+  wrap.classList.remove('dragging');
+});
+
+wrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const [gx, gy] = screenToGrid(mx, my);
+  const zoomFactor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  cellSize = Math.max(16, Math.min(120, cellSize * zoomFactor));
+  const [gx2, gy2] = screenToGrid(mx, my);
+  camX -= (gx2 - gx);
+  camY -= (gy2 - gy);
+  render();
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault();
+    undoLastMove();
+  }
+  if (e.key === 'Escape') cancelChoosing();
+});
+
+wrap.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  cancelChoosing();
+});
+
+function handleClick(e) {
+  if (gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const [gx, gy] = screenToGrid(mx, my);
+  const hx = Math.round(gx);
+  const hy = Math.round(gy);
+  const ck = cellKey(hx, hy);
+  // If already choosing a line for this cell: cycle to next option
+  if (choosingCell && choosingCell.x === hx && choosingCell.y === hy) {
+    choosingIndex = (choosingIndex + 1) % choosingCell.lines.length;
+    render();
+    return;
+  }
+
+  // Cancel any previous choosing on a different cell
+  choosingCell = null;
+
+  if (!validMoves.has(ck)) return;
+  const lines = validMoves.get(ck);
+  if (lines.length === 1) {
+    placeCell(hx, hy, lines[0]);
+  } else {
+    // Enter visual choosing mode
+    choosingCell = { x: hx, y: hy, lines };
+    choosingIndex = 0;
+    render();
+  }
+}
+
+wrap.addEventListener('dblclick', (e) => {
+  if (!choosingCell) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const [gx, gy] = screenToGrid(mx, my);
+  const hx = Math.round(gx);
+  const hy = Math.round(gy);
+  if (choosingCell.x === hx && choosingCell.y === hy) {
+    const chosen = choosingCell.lines[choosingIndex];
+    choosingCell = null;
+    placeCell(hx, hy, chosen);
+  }
+});
+
+function cancelChoosing() {
+  if (choosingCell) { choosingCell = null; render(); }
+}
+
+document.getElementById('btnCenter').addEventListener('click', () => {
+  camX = 4.5; camY = 4.5; render();
+});
+document.getElementById('btnZoomIn').addEventListener('click', () => {
+  cellSize = Math.min(120, cellSize * 1.3); render();
+});
+document.getElementById('btnZoomOut').addEventListener('click', () => {
+  cellSize = Math.max(16, cellSize / 1.3); render();
+});
+document.getElementById('btnReset').addEventListener('click', resetGame);
+document.getElementById('btnUndo').addEventListener('click', undoLastMove);
+
+// ===== THEME =====
+const THEME_KEY = 'line5_theme';
+function applyTheme(theme) {
+  const isLight = theme === 'light';
+  document.body.classList.toggle('light', isLight);
+  document.getElementById('btnTheme').textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem(THEME_KEY, theme);
+  render();
+}
+document.getElementById('btnTheme').addEventListener('click', () => {
+  applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+});
+// Restore saved theme
+applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+
+function resetGame() {
+  document.getElementById('gameOverOverlay').style.display = 'none';
+  filledCells.clear();
+  cellMoveNum = {};
+  drawnSegments.clear();
+  drawnLines = [];
+  undoHistory = [];
+  score = 0;
+  moveCount = 0;
+  gameOver = false;
+  INITIAL_CELLS.forEach(([x, y]) => {
+    filledCells.add(cellKey(x, y));
+    cellMoveNum[cellKey(x, y)] = 0;
+  });
+  computeValidMoves();
+  camX = 4.5; camY = 4.5;
+  cellSize = 52;
+  clearSave();
+  updateUI();
+}
+
+resizeCanvas();
+
+// Try to restore a saved game, otherwise start fresh
+if (loadGame()) {
+  computeValidMoves();
+  if (gameOver) {
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalHighScore').textContent = highScore;
+    document.getElementById('newBestMsg').style.display = 'none';
+    document.getElementById('gameOverOverlay').style.display = 'flex';
+  }
+  updateUI();
+} else {
+  resetGame();
+}
+</script>
+</body>
+</html>
