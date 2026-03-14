@@ -39,7 +39,7 @@
 }
 
 body.light {
-  --bg:           #ffffff;
+  --bg:           #aaaaaa;
   --header-bg:    #16213e;
   --header-border:#0f3460;
   --title-color:  #e94560;
@@ -47,8 +47,8 @@ body.light {
   --accent:       #00fff5;
   --btn-bg:       #0f3460;
   --btn-color:    #e0e0e0;
-  --btn-border:   #e94560;
-  --btn-hover-bg: #e94560;
+  --btn-border:   blue;
+  --btn-hover-bg: blue;
   --undo-bg:      #3a1a5e;
   --undo-border:  #b060ff;
   --undo-hover:   #7c3aed;
@@ -88,7 +88,7 @@ body {
 #header {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 10px;
   padding: 12px 24px;
   background: var(--header-bg);
   width: 100%;
@@ -291,17 +291,19 @@ canvas {
   <h1>LINE-5</h1>
   <div class="stat">Score: <span id="scoreVal">0</span></div>
   <div class="stat">Best: <span id="highScoreVal">0</span></div>
-  <div class="stat">Move: <span id="moveVal">0</span></div>
-  <div class="stat">Available: <span id="availVal">0</span></div>
+  <div class="stat" style="display:none">Move: <span id="moveVal">0</span></div>
+  <div class="stat" style="display:none">Available: <span id="availVal">0</span></div>
   <div id="controls">
-    <button id="btnUndo" disabled>↩&nbsp;Undo</button>
-    <button id="btnReset">Reset</button>
     <button id="btnSaveLoad">💾&nbsp;Save/Load</button>
+    <button id="btnReset">Reset</button>
+    <button id="btnUndo" disabled>↩&nbsp;Undo</button>
+  </div>
+    <div id="controls">
     <button id="btnCenter">Center</button>
     <button id="btnZoomIn">+</button>
     <button id="btnZoomOut">−</button>
     <button id="btnTheme" title="Toggle theme">🌙</button>
-    <span id="savedBadge">✓ Saved</span>
+    <span id="savedBadge" style="display:none">✓ Saved</span>
   </div>
 </div>
 
@@ -382,10 +384,10 @@ function clearSave() {
 
 let savedFadeTimer = null;
 function flashSaved() {
-  const badge = document.getElementById('savedBadge');
-  badge.style.opacity = '1';
-  if (savedFadeTimer) clearTimeout(savedFadeTimer);
-  savedFadeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1200);
+  // const badge = document.getElementById('savedBadge');
+  // badge.style.opacity = '1';
+  // if (savedFadeTimer) clearTimeout(savedFadeTimer);
+  // savedFadeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1200);
 }
 
 function updateHighScore() {
