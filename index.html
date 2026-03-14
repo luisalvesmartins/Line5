@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Line-5 Grid Game</title>
+<title>Line-5 Game</title>
 <style>
 :root {
   /* Dark theme (default) */
@@ -283,6 +283,52 @@ canvas {
   color: var(--info-color);
   padding: 4px;
 }
+#moveMenu {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  background: var(--modal-bg);
+  border-top: 2px solid var(--modal-border);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px 24px;
+  z-index: 250;
+  display: none;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+}
+#moveMenu h4 {
+  color: var(--title-color);
+  font-size: 14px;
+  margin-bottom: 12px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.move-option {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.move-option:hover, .move-option:active { background: var(--accent); color: #1a1a2e; }
+#moveMenuCancel {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 4px;
+  background: transparent;
+  color: var(--stat-color);
+  border: 1px solid var(--stat-color);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -317,6 +363,12 @@ canvas {
   <h3 id="slotTitle">Save / Load</h3>
   <div id="slotRows"></div>
   <button id="slotClose">Close</button>
+</div>
+
+<div id="moveMenu">
+  <h4>Choose direction</h4>
+  <div id="moveMenuOptions"></div>
+  <button id="moveMenuCancel">Cancel</button>
 </div>
 
 
@@ -883,6 +935,7 @@ window.addEventListener('mousemove', (e) => {
 
   // Update which line is previewed based on mouse angle from chosen cell
   if (choosingCell) {
+
     const [csx, csy] = gridToScreen(choosingCell.x, choosingCell.y);
     const angle = Math.atan2(my - csy, mx - csx); // -π to π
     // Map angle to closest line direction
@@ -942,6 +995,95 @@ window.addEventListener('mouseup', (e) => {
   isDragging = false;
   wrap.classList.remove('dragging');
 });
+
+// ===== TOUCH SUPPORT =====
+let touchStartX, touchStartY, touchMoved;
+
+wrap.addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchMoved = false;
+
+  // Long tap = confirm chosen line (same as double-click)
+  if (choosingCell) {
+    longPressTimer = setTimeout(() => {
+      if (choosingCell && !touchMoved) {
+        const chosen = choosingCell.lines[choosingIndex];
+        const cx = choosingCell.x, cy = choosingCell.y;
+        choosingCell = null;
+        hideMoveMenu();
+        placeCell(cx, cy, chosen);
+      }
+    }, 500);
+  }
+}, { passive: true });
+
+wrap.addEventListener('touchmove', (e) => {
+  const t = e.touches[0];
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  if (Math.abs(dx) + Math.abs(dy) > 16) {
+    touchMoved = true;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  }
+  // Always update choosing preview angle on touch move (regardless of touchMoved)
+  if (choosingCell) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = t.clientX - rect.left;
+    const my = t.clientY - rect.top;
+    const [csx, csy] = gridToScreen(choosingCell.x, choosingCell.y);
+    const angle = Math.atan2(my - csy, mx - csx);
+    const lines = choosingCell.lines;
+    let bestIdx = 0, bestDot = -Infinity;
+    for (let li = 0; li < lines.length; li++) {
+      const c = lines[li].cells;
+      const adx = c[4][0] - c[0][0];
+      const ady = c[4][1] - c[0][1];
+      const lineAngle = Math.atan2(ady, adx);
+      const diff = angle - lineAngle;
+      const best = Math.max(Math.cos(diff), Math.cos(diff + Math.PI));
+      if (best > bestDot) { bestDot = best; bestIdx = li; }
+    }
+    if (choosingIndex !== bestIdx) { choosingIndex = bestIdx; render(); }
+  }
+}, { passive: true });
+
+wrap.addEventListener('touchend', (e) => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (!touchMoved) {
+    const t = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const mx = t.clientX - rect.left;
+    const my = t.clientY - rect.top;
+    const [gx, gy] = screenToGrid(mx, my);
+    const hx = Math.round(gx);
+    const hy = Math.round(gy);
+    const ck = cellKey(hx, hy);
+
+    if (gameOver) return;
+
+    // If already choosing this cell, show menu again (or cycle on desktop)
+    if (choosingCell && choosingCell.x === hx && choosingCell.y === hy) {
+      showMoveMenu(hx, hy, choosingCell.lines);
+      return;
+    }
+
+    choosingCell = null;
+    hideMoveMenu();
+
+    if (!validMoves.has(ck)) return;
+    const lines = validMoves.get(ck);
+    if (lines.length === 1) {
+      placeCell(hx, hy, lines[0]);
+    } else {
+      choosingCell = { x: hx, y: hy, lines };
+      choosingIndex = 0;
+      render();
+      showMoveMenu(hx, hy, lines);
+    }
+  }
+}, { passive: true });
 
 wrap.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -1017,8 +1159,53 @@ wrap.addEventListener('dblclick', (e) => {
 });
 
 function cancelChoosing() {
-  if (choosingCell) { choosingCell = null; render(); }
+  if (choosingCell) {
+    choosingCell = null;
+    hideMoveMenu();
+    render();
+  }
 }
+
+function showMoveMenu(x, y, lines) {
+  const opts = document.getElementById('moveMenuOptions');
+  opts.innerHTML = '';
+  // Sort: horizontal → lowest x first; vertical → lowest y first; diagonal → lowest x first
+  const sorted = [...lines].sort((a, b) => {
+    const ax = Math.min(a.cells[0][0], a.cells[4][0]);
+    const ay = Math.min(a.cells[0][1], a.cells[4][1]);
+    const bx = Math.min(b.cells[0][0], b.cells[4][0]);
+    const by = Math.min(b.cells[0][1], b.cells[4][1]);
+    const aIsVertical = a.cells[0][0] === a.cells[4][0];
+    const bIsVertical = b.cells[0][0] === b.cells[4][0];
+    if (aIsVertical && !bIsVertical) return 1;
+    if (!aIsVertical && bIsVertical) return -1;
+    if (aIsVertical) return ay - by;   // both vertical: sort by lowest y
+    return ax - bx;                    // horizontal or diagonal: sort by lowest x
+  });
+  sorted.forEach((line) => {
+    const btn = document.createElement('button');
+    btn.className = 'move-option';
+    const c = line.cells;
+    // Ensure display always shows lowest coord first
+    const [x0, y0, x1, y1] = c[0][0] <= c[4][0]
+      ? [c[0][0], c[0][1], c[4][0], c[4][1]]
+      : [c[4][0], c[4][1], c[0][0], c[0][1]];
+    btn.textContent = `${DIR_NAMES[line.dirIndex]}  (${x0},${y0}) → (${x1},${y1})`;
+    btn.addEventListener('click', () => {
+      hideMoveMenu();
+      choosingCell = null;
+      placeCell(x, y, line);
+    });
+    opts.appendChild(btn);
+  });
+  document.getElementById('moveMenu').style.display = 'block';
+}
+
+function hideMoveMenu() {
+  document.getElementById('moveMenu').style.display = 'none';
+}
+
+document.getElementById('moveMenuCancel').addEventListener('click', cancelChoosing);
 
 document.getElementById('btnCenter').addEventListener('click', () => {
   camX = 4.5; camY = 4.5; render();
@@ -1146,6 +1333,8 @@ applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 
 function resetGame() {
   document.getElementById('gameOverOverlay').style.display = 'none';
+  hideMoveMenu();
+  choosingCell = null;
   filledCells.clear();
   cellMoveNum = {};
   drawnSegments.clear();
