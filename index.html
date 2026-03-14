@@ -193,7 +193,74 @@ canvas {
   font-size: 18px;
   cursor: pointer;
 }
-#highScoreVal { color: #ffd700 !important; }
+
+#slotPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--modal-bg);
+  border: 2px solid var(--modal-border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  z-index: 250;
+  display: none;
+  min-width: 280px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#slotPanel h3 { color: var(--title-color); margin-bottom: 16px; font-size: 16px; text-align: center; }
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.slot-label {
+  width: 60px;
+  font-size: 13px;
+  color: var(--stat-color);
+}
+.slot-info {
+  flex: 1;
+  font-size: 12px;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slot-save-btn, .slot-load-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid;
+}
+.slot-save-btn {
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  border-color: var(--btn-border);
+}
+.slot-save-btn:hover { background: var(--btn-hover-bg); color: #fff; }
+.slot-load-btn {
+  background: var(--undo-bg);
+  color: var(--btn-color);
+  border-color: var(--undo-border);
+}
+.slot-load-btn:hover { background: var(--undo-hover); color: #fff; }
+.slot-load-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+#slotClose {
+  display: block;
+  margin: 16px auto 0;
+  padding: 5px 20px;
+  background: transparent;
+  color: var(--stat-color);
+  border: 1px solid var(--stat-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+#slotClose:hover { background: var(--header-border); }
+
 .new-best { animation: pulse-gold 0.6s ease-in-out 3; }
 @keyframes pulse-gold {
   0%,100% { text-shadow: none; }
@@ -226,6 +293,7 @@ canvas {
   <div id="controls">
     <button id="btnUndo" disabled>↩ Undo</button>
     <button id="btnReset">Reset</button>
+    <button id="btnSaveLoad">💾 Save/Load</button>
     <button id="btnCenter">Center</button>
     <button id="btnZoomIn">+</button>
     <button id="btnZoomOut">−</button>
@@ -239,6 +307,12 @@ canvas {
 </div>
 
 <div id="tooltip"></div>
+
+<div id="slotPanel">
+  <h3 id="slotTitle">Save / Load</h3>
+  <div id="slotRows"></div>
+  <button id="slotClose">Close</button>
+</div>
 
 
 <div id="gameOverOverlay">
@@ -951,6 +1025,103 @@ document.getElementById('btnZoomOut').addEventListener('click', () => {
 });
 document.getElementById('btnReset').addEventListener('click', resetGame);
 document.getElementById('btnUndo').addEventListener('click', undoLastMove);
+
+// ===== MANUAL SAVE / LOAD SLOTS =====
+const NUM_SLOTS = 4;
+const SLOT_PREFIX = 'line5_slot_';
+
+function getSlotKey(n) { return SLOT_PREFIX + n; }
+
+function slotMeta(n) {
+  try {
+    const raw = localStorage.getItem(getSlotKey(n));
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return { score: s.score, moveCount: s.moveCount, date: s.savedAt || '' };
+  } catch(e) { return null; }
+}
+
+function saveToSlot(n) {
+  const state = {
+    filledCells: [...filledCells],
+    cellMoveNum,
+    drawnSegments: [...drawnSegments],
+    drawnLines,
+    score,
+    moveCount,
+    gameOver,
+    undoHistory,
+    camX, camY, cellSize,
+    savedAt: new Date().toLocaleString()
+  };
+  localStorage.setItem(getSlotKey(n), JSON.stringify(state));
+  renderSlotPanel();
+  flashSaved();
+}
+
+function loadFromSlot(n) {
+  try {
+    const raw = localStorage.getItem(getSlotKey(n));
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    filledCells = new Set(s.filledCells);
+    cellMoveNum = s.cellMoveNum;
+    drawnSegments = new Set(s.drawnSegments);
+    drawnLines = s.drawnLines;
+    score = s.score;
+    moveCount = s.moveCount;
+    gameOver = s.gameOver;
+    undoHistory = s.undoHistory;
+    camX = s.camX; camY = s.camY; cellSize = s.cellSize;
+    computeValidMoves();
+    document.getElementById('slotPanel').style.display = 'none';
+    if (gameOver) {
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('finalHighScore').textContent = highScore;
+      document.getElementById('newBestMsg').style.display = 'none';
+      document.getElementById('gameOverOverlay').style.display = 'flex';
+    }
+    updateUI();
+  } catch(e) {}
+}
+
+function renderSlotPanel() {
+  const container = document.getElementById('slotRows');
+  container.innerHTML = '';
+  for (let n = 1; n <= NUM_SLOTS; n++) {
+    const meta = slotMeta(n);
+    const row = document.createElement('div');
+    row.className = 'slot-row';
+    const label = document.createElement('span');
+    label.className = 'slot-label';
+    label.textContent = `Slot ${n}`;
+    const info = document.createElement('span');
+    info.className = 'slot-info';
+    info.textContent = meta ? `Score ${meta.score} · Move ${meta.moveCount} · ${meta.date}` : '— empty —';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'slot-save-btn';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', () => saveToSlot(n));
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'slot-load-btn';
+    loadBtn.textContent = 'Load';
+    loadBtn.disabled = !meta;
+    loadBtn.addEventListener('click', () => loadFromSlot(n));
+    row.appendChild(label);
+    row.appendChild(info);
+    row.appendChild(saveBtn);
+    row.appendChild(loadBtn);
+    container.appendChild(row);
+  }
+}
+
+document.getElementById('btnSaveLoad').addEventListener('click', () => {
+  renderSlotPanel();
+  document.getElementById('slotPanel').style.display = 'block';
+});
+document.getElementById('slotClose').addEventListener('click', () => {
+  document.getElementById('slotPanel').style.display = 'none';
+});
 
 // ===== THEME =====
 const THEME_KEY = 'line5_theme';
