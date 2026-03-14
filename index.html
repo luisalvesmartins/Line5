@@ -15,6 +15,38 @@
   --accent:       #00fff5;
   --btn-bg:       #0f3460;
   --btn-color:    #e0e0e0;
+  --btn-border:   blue;
+  --btn-hover-bg: blue;
+  --undo-bg:      #3a1a5e;
+  --undo-border:  #b060ff;
+  --undo-hover:   #7c3aed;
+  --tooltip-bg:   rgba(15,52,96,0.95);
+  --tooltip-border:#e94560;
+  --overlay-bg:   rgba(0,0,0,0.8);
+  --modal-bg:     #16213e;
+  --modal-border: #e94560;
+  --info-color:   #666;
+  --saved-color:  #00fff5;
+  /* Canvas colors (read by JS) */
+  --c-grid:       rgba(255, 255, 255, 0.07);
+  --c-dot:        rgba(255,255,255,0.08);
+  --c-line-glow:  rgba(0,255,245,0.12);
+  --c-line:       rgba(0,255,245,0.55);
+  --c-cell-init:  #2a5298;
+  --c-cell-init-stroke: #4a8fe7;
+  --c-cell-play:  #e94560;
+  --c-cell-play-stroke: #ff6b81;
+}
+
+body.light {
+  --bg:           #ffffff;
+  --header-bg:    #16213e;
+  --header-border:#0f3460;
+  --title-color:  #e94560;
+  --stat-color:   #a0a0c0;
+  --accent:       #00fff5;
+  --btn-bg:       #0f3460;
+  --btn-color:    #e0e0e0;
   --btn-border:   #e94560;
   --btn-hover-bg: #e94560;
   --undo-bg:      #3a1a5e;
@@ -27,46 +59,14 @@
   --modal-border: #e94560;
   --info-color:   #666;
   --saved-color:  #00fff5;
-  /* Canvas colors (read by JS) */
-  --c-grid:       rgba(255,255,255,0.07);
+  --c-grid:       rgba(0,0,0,0);
   --c-dot:        rgba(255,255,255,0.08);
   --c-line-glow:  rgba(0,255,245,0.12);
   --c-line:       rgba(0,255,245,0.55);
   --c-cell-init:  #2a5298;
   --c-cell-init-stroke: #4a8fe7;
-  --c-cell-play:  #e94560;
-  --c-cell-play-stroke: #ff6b81;
-}
-
-body.light {
-  --bg:           #f0f4f8;
-  --header-bg:    #dbe4ee;
-  --header-border:#b0c4de;
-  --title-color:  #c0392b;
-  --stat-color:   #555e6e;
-  --accent:       #0077cc;
-  --btn-bg:       #b0c4de;
-  --btn-color:    #1a1a2e;
-  --btn-border:   #c0392b;
-  --btn-hover-bg: #c0392b;
-  --undo-bg:      #d8c8f0;
-  --undo-border:  #7c3aed;
-  --undo-hover:   #7c3aed;
-  --tooltip-bg:   rgba(219,228,238,0.97);
-  --tooltip-border:#c0392b;
-  --overlay-bg:   rgba(0,0,0,0.5);
-  --modal-bg:     #dbe4ee;
-  --modal-border: #c0392b;
-  --info-color:   #999;
-  --saved-color:  #0077cc;
-  --c-grid:       rgba(0,0,0,0.08);
-  --c-dot:        rgba(0,0,0,0.1);
-  --c-line-glow:  rgba(0,100,200,0.12);
-  --c-line:       rgba(0,100,200,0.55);
-  --c-cell-init:  #5b8dd9;
-  --c-cell-init-stroke: #2a5298;
-  --c-cell-play:  #c0392b;
-  --c-cell-play-stroke: #e74c3c;
+  --c-cell-play:  #9fe945;
+  --c-cell-play-stroke: #9fe945;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -81,6 +81,9 @@ body {
   overflow: hidden;
   user-select: none;
   transition: background 0.3s, color 0.3s;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
 }
 #header {
   display: flex;
@@ -291,9 +294,9 @@ canvas {
   <div class="stat">Move: <span id="moveVal">0</span></div>
   <div class="stat">Available: <span id="availVal">0</span></div>
   <div id="controls">
-    <button id="btnUndo" disabled>↩ Undo</button>
+    <button id="btnUndo" disabled>↩&nbsp;Undo</button>
     <button id="btnReset">Reset</button>
-    <button id="btnSaveLoad">💾 Save/Load</button>
+    <button id="btnSaveLoad">💾&nbsp;Save/Load</button>
     <button id="btnCenter">Center</button>
     <button id="btnZoomIn">+</button>
     <button id="btnZoomOut">−</button>
@@ -629,7 +632,6 @@ function render() {
   const cInitStroke = cs.getPropertyValue('--c-cell-init-stroke').trim();
   const cPlay     = cs.getPropertyValue('--c-cell-play').trim();
   const cPlayStroke = cs.getPropertyValue('--c-cell-play-stroke').trim();
-
   // Grid lines aligned through intersections (cell centers)
   ctx.strokeStyle = cGrid;
   ctx.lineWidth = 1;
@@ -905,6 +907,7 @@ window.addEventListener('mousemove', (e) => {
 
   const tooltip = document.getElementById('tooltip');
   const ck = cellKey(hx, hy);
+if (1==0){
   if (choosingCell) {
     const line = choosingCell.lines[choosingIndex];
     tooltip.style.display = 'block';
@@ -925,6 +928,7 @@ window.addEventListener('mousemove', (e) => {
     tooltip.textContent = mn === 0 ? `(${hx}, ${hy}) — initial` : `(${hx}, ${hy}) — move #${mn}`;
   } else {
     tooltip.style.display = 'none';
+  }
   }
 });
 
